@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
+#include<Motors.h>
 
 // ===================== DEBUG LOG (USART1 -> J7 "usb ttl": PA9 TX / PA10 RX) =====================
 #define DEBUG_LOG 1   // set to 0 for the real run: printing every packet slows the loop
@@ -31,32 +32,41 @@ EthernetUDP Udp;
 // J4 cytron1:         pwm1=PB1, pwm2=PB0, pwm3=PA7, pwm4=PA6
 // J5 cytron2:         pwm5=PA3, pwm6=PA2, pwm7=PA1, pwm8=PA0
 // J6 vertical cytron: pwm9=PB6, pwm10=PB7, pwm11=PB8, pwm12=PB9
-#define TL_IN1 PB1   // pwm1
-#define TL_IN2 PB0   // pwm2
+//the convention used here is that the pwm first then dir pin
 
-#define TR_IN1 PA7   // pwm3
-#define TR_IN2 PA6   // pwm4
 
-#define BR_IN1 PA3   // pwm5
-#define BR_IN2 PA2   // pwm6
+#define TL_IN1 PB0   // pwm1
+#define TL_IN2 PB1   // pwm2
 
-#define BL_IN1 PA1   // pwm7
-#define BL_IN2 PA0   // pwm8
+#define TR_IN1 PA6   // pwm3
+#define TR_IN2 PA7   // pwm4
+
+#define BR_IN1 PA2   // pwm5
+#define BR_IN2 PA3   // pwm6
+
+#define BL_IN1 PA0   // pwm7
+#define BL_IN2 PA1   // pwm8
 
 #define UP1_PWM PB6  // pwm9
 #define UP1_DIR PB7  // pwm10
 #define UP2_PWM PB8  // pwm11
 #define UP2_DIR PB9  // pwm12
+CytronMDD10A v1(UP1_PWM,UP1_DIR);
+CytronMDD10A v2(UP2_PWM,UP2_DIR);
+CytronMDD10A tl(TL_IN1,TL_IN2);
+CytronMDD10A tr(TR_IN1,TR_IN2);
+CytronSmallDriver bl(BR_IN1,BR_IN2);
+CytronSmallDriver br(BL_IN1,BL_IN2);
 
-#define gripper PC13 // not routed to a connector on the PCB (this is the on-board LED pin)
+// this array aims to achieve runtime polymorphism so when an action is applied to all no need to specify the exact class
+Motor* motors[] = { &tl,&tr,&bl,&br,&v1, &v2 };
 
 #define FAILSAFE_TIMEOUT 1000  // stop motors if no packet arrives within this window (ms)
 
 unsigned long lastPacketTime = 0;
 bool motorsStopped = false;
 
-const uint8_t IN1_PINS[6] = {TL_IN1, TR_IN1, BR_IN1, BL_IN1, UP1_PWM, UP2_PWM};
-const uint8_t IN2_PINS[6] = {TL_IN2, TR_IN2, BR_IN2, BL_IN2, UP1_DIR, UP2_DIR};
+
 
 uint8_t Packet[12];
 
@@ -91,67 +101,29 @@ void setup() {
     LOG("Link (1 = ON): ");
     LOGLN((int)Ethernet.linkStatus());
 
-    // 5. Motor pins last
-    for (uint8_t i = 0; i < 6; i++) {
-        pinMode(IN1_PINS[i], OUTPUT);
-        pinMode(IN2_PINS[i], OUTPUT);
-    }
-    pinMode(gripper, OUTPUT);
+
 
     lastPacketTime = millis();   // don't trip the failsafe at boot
     LOGLN("UDP Motor Controller Ready");
 }
 
-inline void updateMotors(uint8_t* data) {
+void updateMotors(uint8_t* data) {
     // ===== 4 main motors (PWM + DIR via dual-input driver) =====
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t speed = data[i];
         uint8_t dir   = data[6 + i];   // 0 or 1
-
-        if (dir == 0) {
-            analogWrite(IN1_PINS[i], speed);
-            analogWrite(IN2_PINS[i], 0);
-        } else {
-            analogWrite(IN1_PINS[i], 0);
-            analogWrite(IN2_PINS[i], speed);
-        }
-    }
-
-    // ===== vertical motors: full speed only, no PWM =====
-    uint8_t up1_pwm = data[4];
-    uint8_t up2_pwm = data[5];
-    uint8_t up1_dir = data[10];   // packet has one vertical direction byte; UP2 shares it
-    uint8_t grip    = data[11];
-
-    if (up1_pwm == 0) {
-        digitalWrite(UP1_PWM, LOW);
-        digitalWrite(UP1_DIR, LOW);
-    } else {
-        digitalWrite(UP1_DIR, up1_dir);
-        digitalWrite(UP1_PWM, HIGH);
-    }
-
-    if (up2_pwm == 0) {
-        digitalWrite(UP2_PWM, LOW);
-        digitalWrite(UP2_DIR, LOW);
-    } else {
-        digitalWrite(UP2_DIR, up1_dir);
-        digitalWrite(UP2_PWM, HIGH);
-    }
-
-    digitalWrite(gripper, grip);
+        motors[i]->move(dir,speed);
 }
 
-inline void stopMotors() {
-    for (uint8_t i = 0; i < 4; i++) {
-        analogWrite(IN1_PINS[i], 0);
-        analogWrite(IN2_PINS[i], 0);
-    }
-    digitalWrite(UP1_PWM, LOW);
-    digitalWrite(UP1_DIR, LOW);
-    digitalWrite(UP2_PWM, LOW);
-    digitalWrite(UP2_DIR, LOW);
+    v1.move(data[10],data[4]);
+    v2.move(data[10],data[5]);
 }
+
+void stopMotors() {
+    for (Motor* m: motors){
+        m->stop();
+
+    }}
 
 void loop() {
     int packetSize;
