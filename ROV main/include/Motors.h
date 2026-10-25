@@ -18,6 +18,11 @@ public:
 protected:
   uint8_t pin1;
   uint8_t pin2;
+  uint8_t cur_dir=0;
+  uint8_t cur_spd=0;
+  
+
+
 };
 
 

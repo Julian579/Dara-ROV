@@ -52,7 +52,7 @@ for _ in range(15):
 print("System Ready. Press Button A/0 to Arm.")
 
 # --- MAIN LOOP ---
-gripper=0
+heartbeat=0
 try:
     while True:
         pygame.event.pump()
@@ -79,6 +79,8 @@ try:
         raw_az = controller.get_axis(3)
 
         # Apply processing pipeline
+        #this function structure should be modified later as its non intutive
+        #the buffer is too long it may be better to use exponential filter or 1 euro filter search about it
         ax = int(clean(smooth(bufs[0], deadzone(raw_ax))) * Max_pwm)
         ay = int(clean(smooth(bufs[1], deadzone(raw_ay))) * Max_pwm)
         yw = int(clean(smooth(bufs[2], deadzone(raw_yw))) * Max_pwm)
@@ -101,16 +103,18 @@ try:
             # Clamp to Max_pwm range
             v = max(-Max_pwm, min(Max_pwm, v))
             if v >= 0:
-                dirs.append(1)
+                dirs.append(0)
                 pwms.append(int(v))
             else:
                 dirs.append(0)
-                pwms.append(int(-v))
+                #the sign doesnt matter the mcu uses only the dir
+                pwms.append(int(v))
 
         # Pack and Send
         pwms.append(0)
-        dirs.append(gripper) # Add gripper state to the end of the directions
+        dirs.append(heartbeat) # Add heartbeat state to the end of the directions
         packet = struct.pack(PACK_FORMAT, *pwms, *dirs)
+        heartbeat^=1
         
         try:
             client.sendto(packet, (TARGET_IP, TARGET_PORT))
@@ -118,6 +122,7 @@ try:
                 print(f"PWMs: {pwms} | Power: {Max_pwm}")
         except OSError:
             print("Network unreachable. Check connection to ROV.")
+
 
         time.sleep(0.1) # ~20Hz update rate
 

@@ -16,6 +16,7 @@
 // ===================== NETWORK CONFIG =====================
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(192, 168, 1, 50);
+int heartbeat=-1;
 #define PORT 9090
 
 EthernetUDP Udp;
@@ -125,35 +126,37 @@ void stopMotors() {
 
     }}
 
+
+
+
 void loop() {
-    int packetSize;
     Ethernet.maintain();
 
+    int packetSize;
     while ((packetSize = Udp.parsePacket()) > 0) {
         if (packetSize == 12) {
             Udp.read(Packet, 12);
-
-#if DEBUG_LOG
-            LOG("Packet: ");
-            for (uint8_t i = 0; i < 12; i++) {
-                LOG(Packet[i]);
-                LOG(i < 11 ? "," : "\n");
+            uint8_t hb = Packet[11];
+            // i am thinking about making the heartt beat be a counter from 0 to 255 (i+=1;i%=256) to be able to detect more drops or know if the packets are old
+            if (heartbeat != -1 && hb != heartbeat) {
+                stopMotors();                
+                motorsStopped = true;
+            } else {
+                updateMotors(Packet);
+                lastPacketTime = millis();
+                motorsStopped = false;
             }
-#endif
-
-            updateMotors(Packet);
-            lastPacketTime = millis();
-            motorsStopped = false;
+            heartbeat = hb ^ 1;             
         } else {
-            LOG("Unexpected packet size: ");
-            LOGLN(packetSize);
-            Udp.flush();
+            Udp.flush();                      
         }
     }
 
-    // Stop once per timeout, not on every loop pass
-    if (!motorsStopped && millis() - lastPacketTime > FAILSAFE_TIMEOUT) {
+    if (!motorsStopped &&
+        (millis() - lastPacketTime > FAILSAFE_TIMEOUT ||
+         Ethernet.linkStatus() == LinkOFF)) {
         stopMotors();
         motorsStopped = true;
+        heartbeat=-1;
     }
 }
