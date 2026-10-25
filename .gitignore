@@ -1,0 +1,25 @@
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Python (controller code.PY)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors / IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# PlatformIO (safety net if you ever open the root folder)
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Secrets and local config
+.env
+secrets.h
+credentials.*
