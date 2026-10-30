@@ -36,11 +36,11 @@ EthernetUDP Udp;
 //the convention used here is that the pwm first then dir pin
 
 
-#define TL_IN1 PB0   // pwm1
-#define TL_IN2 PB1   // pwm2
+#define TL_IN1 PB1   // pwm1
+#define TL_IN2 PB0   // pwm2
 
-#define TR_IN1 PA6   // pwm3
-#define TR_IN2 PA7   // pwm4
+#define TR_IN1 PA7   // pwm3
+#define TR_IN2 PA6   // pwm4m 
 
 #define BR_IN1 PA2   // pwm5
 #define BR_IN2 PA3   // pwm6
@@ -48,10 +48,10 @@ EthernetUDP Udp;
 #define BL_IN1 PA0   // pwm7
 #define BL_IN2 PA1   // pwm8
 
-#define UP1_PWM PB6  // pwm9
-#define UP1_DIR PB7  // pwm10
-#define UP2_PWM PB8  // pwm11
-#define UP2_DIR PB9  // pwm12
+#define UP1_PWM PB7  // pwm9
+#define UP1_DIR PB6  // pwm10
+#define UP2_PWM PB9  // pwm11
+#define UP2_DIR PB8  // pwm12
 CytronMDD10A v1(UP1_PWM,UP1_DIR);
 CytronMDD10A v2(UP2_PWM,UP2_DIR);
 CytronMDD10A tl(TL_IN1,TL_IN2);
@@ -109,7 +109,7 @@ void setup() {
 }
 
 void updateMotors(uint8_t* data) {
-    // ===== 4 main motors (PWM + DIR via dual-input driver) =====
+    // ===== 4 main motors (PWM + DIR via dual-input driver) ====
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t speed = data[i];
         uint8_t dir   = data[6 + i];   // 0 or 1
