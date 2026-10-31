@@ -14,7 +14,7 @@ LOOP_PERIOD  = 0.02         # seconds between packets (50 Hz)
 # byte  10  : DIR  shared by channels 4 and 5
 # byte  11  : heartbeat, must flip 0/1 on every packet sent (firmware stops on mismatch)
 
-FWD_BIT = 0                 # value of FORWARD in Motors.h (check it)
+FWD_BIT = 0                
 REV_BIT = 1 - FWD_BIT
 
 # =====================================================================================
@@ -23,23 +23,15 @@ REV_BIT = 1 - FWD_BIT
 # Which firmware channel (0-5) each bilge (by position on the vehicle) is wired to.
 # Any bilge can use any channel (vertical <-> horizontal is fine); every channel 0-5
 # must be used exactly once. Swap two bilges by swapping their numbers.
-#
-# FIRMWARE LIMIT: channels 4 and 5 share ONE dir bit. The two bilges on channels 4/5
-# can't run in opposite directions at the same moment. If they are asked to, the weaker
-# one is stopped (and a warning is printed) instead of spinning the wrong way.
 THRUSTER_CHANNEL = {"TL": 5, "TR": 4, "BR": 2, "BL": 3, "UP1": 1, "UP2": 0}
 
-# Bilges that spin backwards (any of TL, TR, BR, BL, UP1, UP2).
-# If both bilges on channels 4/5 are vertical, invert both or neither (shared dir bit).
 INVERT = set()              # e.g. {"TR", "BL"}
 
 THRUSTERS = ["TL", "TR", "BR", "BL", "UP1", "UP2"]
 VERT      = ["UP1", "UP2"]
 N_MOTORS  = len(THRUSTERS)
 
-# --- TEST MODE CONFIG ---
-TEST_PWM = 255              # fixed power during single-bilge test (0-255)
-
+TEST_PWM = 255             
 # --- CONTROLLER MAPPING ---
 # PS4 / PS5 "Wireless Controller" on Ubuntu 24 (hid-playstation driver, SDL 2.30)
 #   Buttons: 0 Cross, 1 Circle, 2 Triangle, 3 Square, 4 L1, 5 R1, 6 L2, 7 R2,
@@ -55,6 +47,8 @@ AXIS_SURGE_SWAY_X = 0       # left stick X
 AXIS_SURGE_SWAY_Y = 1       # left stick Y
 AXIS_YAW          = 3       # right stick X
 AXIS_HEAVE        = 4       # right stick Y
+UP_AXIS=5
+DOWN_AXIS=2
 
 # Fallback D-pad buttons, only used if the controller reports NO hat
 FALLBACK_DPAD_BTNS = {"up": 11, "down": 12, "left": 13, "right": 14}
@@ -92,25 +86,15 @@ def print_map():
         print(f"WARNING: {a} (ch4) and {b} (ch5) share ONE dir bit. They can't run in "
               f"opposite directions at once; the weaker one will be stopped if asked to.")
 
-_shared_conflict = False
+
 def to_channels(cmd):
     """cmd = {thruster: signed value} -> 6 signed values in CHANNEL order,
     with the bilge map and inversion applied."""
-    global _shared_conflict
+   
     out = [0] * N_MOTORS
     for name, v in cmd.items():
         out[THRUSTER_CHANNEL[name]] = -v if is_inverted(name) else v
-
-    # Channels 4/5 share one dir bit: never let one of them run backwards.
-    if out[4] * out[5] < 0:
-        loser = 4 if abs(out[4]) < abs(out[5]) else 5
-        out[loser] = 0
-        if not _shared_conflict:
-            _shared_conflict = True
-            print(f"[WARN] {thruster_at(4)} and {thruster_at(5)} want opposite directions "
-                  f"but share one dir bit -> stopping {thruster_at(loser)}")
-    else:
-        _shared_conflict = False
+    
     return out
 
 # ------------------------------------------------------------------------------------
@@ -285,7 +269,7 @@ try:
             ax = int(deadzone( axis(AXIS_SURGE_SWAY_X)) * Max_pwm)
             ay = int(deadzone(-axis(AXIS_SURGE_SWAY_Y)) * Max_pwm)
             yw = int(deadzone( axis(AXIS_YAW))          * Max_pwm)
-            az = int(deadzone( axis(AXIS_HEAVE))        * -Max_pwm)
+            az = int(deadzone( axis(UP_AXIS))* -Max_pwm - deadzone( axis(DOWN_AXIS))*-Max_pwm)
 
             cmd = {
                 "TL":  ax + ay + yw,
