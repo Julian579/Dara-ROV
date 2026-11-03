@@ -4,7 +4,7 @@ import socket, struct, pygame, time
 PACK_FORMAT  = '6B6B'
 TARGET_IP    = "192.168.1.50"
 TARGET_PORT  = 9090
-DEADZONE_VAL = 0.2
+DEADZONE_VAL = 0.5
 LOOP_PERIOD  = 0.02         # seconds between packets (50 Hz)
 
 # --- PACKET LAYOUT (must match updateMotors() on the STM32 -- do NOT change) ---
@@ -112,11 +112,14 @@ def dbit(v):
 def build_packet(m, limit, hb):
     """m = 6 signed values in CHANNEL order (use to_channels() to get them)."""
     m = [max(-limit, min(limit, int(v))) for v in m]
-    pwms = [abs(v) for v in m]                       # bytes 0-5
-    dirs = [dbit(v) for v in m[:4]]                  # bytes 6-9
-    shared = [v for v in m[4:] if v != 0]            # ch4/ch5 share one dir bit
-    dirs.append(dbit(shared[0]) if shared else 0)    # byte 10
-    dirs.append(hb)                                  # byte 11
+    pwms = [abs(v) for v in m]
+    dir=0                       # bytes 0-5
+    for v,i in enumerate(m):
+        dir+=(dbit(v) << i)                   # bytes 6
+     
+    dir+=(hb<<7)
+    dirs=[]
+    dirs.append(dir)                                 
     return struct.pack(PACK_FORMAT, *pwms, *dirs)
 
 _last_shown = None

@@ -29,11 +29,6 @@ EthernetUDP Udp;
 #define W5500_MOSI PB5
 #define W5500_CS   PA15
 
-// ===================== PIN MAP (per PCB) =====================
-// J4 cytron1:         pwm1=PB1, pwm2=PB0, pwm3=PA7, pwm4=PA6
-// J5 cytron2:         pwm5=PA3, pwm6=PA2, pwm7=PA1, pwm8=PA0
-// J6 vertical cytron: pwm9=PB6, pwm10=PB7, pwm11=PB8, pwm12=PB9
-//the convention used here is that the pwm first then dir pin
 
 
 #define TL_IN1 PB1   // pwm1
@@ -112,7 +107,7 @@ void updateMotors(uint8_t* data) {
     // ===== 4 main motors (PWM + DIR via dual-input driver) ====
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t speed = data[i];
-        uint8_t dir   = data[6 + i];   // 0 or 1
+        uint8_t dir   = data[6]&(1<<i);   // 0 or 1
         motors[i]->move(dir,speed);
 }
 
@@ -136,7 +131,7 @@ void loop() {
     while ((packetSize = Udp.parsePacket()) > 0) {
         if (packetSize == 12) {
             Udp.read(Packet, 12);
-            uint8_t hb = Packet[11];
+            uint8_t hb = Packet[6]&(1<<7);
             // i am thinking about making the heartt beat be a counter from 0 to 255 (i+=1;i%=256) to be able to detect more drops or know if the packets are old
             if (heartbeat != -1 && hb != heartbeat) {
                 stopMotors();                
